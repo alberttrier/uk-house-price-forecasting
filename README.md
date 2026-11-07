@@ -1,7 +1,7 @@
 # UK-house-price-forecasting
-**Question:** Does UK house price growth have momentum, which months were unusual, and can simple time-series models forecast it better than a naive guess?
+**Question:** Does UK house price growth have momentum, which months were unusual, and can simple time-series models forecast it better than a naive guess or random distribution?
 
-**Status:** Data preparation, momentum and noise tests, a timing-shock analysis and a SQL anomaly detector are done. Forecast comparison is next.
+**Status:** Data preparation, momentum and noise tests, a timing-shock analysis and a SQL anomaly detector are done. Forecast comparison and emerging questions further outlined in research log are next.
 
 The thinking behind each step, my predictions and the ideas I want to follow up are in the [research log](RESEARCH_LOG.md).
 
@@ -12,10 +12,10 @@ The thinking behind each step, my predictions and the ideas I want to follow up 
 - Sample: January 2005 to August 2026, monthly (about 260 months)
 
 ## Why these choices
-- **Growth instead of price levels.** House prices rise over time, so price levels drift upwards. Models work better on monthly growth, which moves around a stable average. I use log growth: 100 × (log price this month − log price last month).
-- **Seasonally adjusted prices.** There exists a stable seasonal pattern in real-estate sales, more houses statistically sell in summer and autumn. The adjusted series removes this pattern, so the analysis focuses on real changes. Other influencing patterns also assumed but not yet identified nor adjusted.
-- **Start in 2005.** The UK HPI covers England and Wales from 1995, Scotland from 2004 and Northern Ireland from 2005, so the UK series only starts in 2005. I start all regions in 2005 so they cover the same period.
-- **Older data removed.** The file goes back to 1968, but the early data shows flat months followed by sudden jumps, which is not real monthly movement. Distorts results and the measure of forecasting quality, therefore removed.
+- **Growth instead of price levels.** House prices rise over time, so price levels drift upwards, whereas growth moves around a more stable average, with which models work better. I use log growth: 100 × (log price this month − log price last month).
+- **Seasonally adjusted prices.** There exists a stable seasonal pattern in real-estate sales, more houses statistically sell in summer and autumn. The adjusted series removes this pattern already, so the analysis focuses on real changes. Other influencing patterns are also assumed but not yet identified nor adjusted. I assume most of the measured data to be a result of mostly a variety of patterns weighted to different degrees with some degree of noise.
+- **Start in 2005.** The UK HPI covers England and Wales from 1995, Scotland from 2004 and Northern Ireland from 2005, so the UK series only starts in 2005. I start all regions in 2005 so they cover the same period, other measurements used to compare all three and draw conclusions out of their relation would distort findings.
+- **Older data removed.** The file goes back to 1968, but the early data shows flat months followed by sudden jumps, which is  most likely not real monthly movement. Distorts results and the measure of forecasting quality, therefore removed.
 
 ## Findings
 
@@ -26,10 +26,10 @@ The thinking behind each step, my predictions and the ideas I want to follow up 
 | Scotland | −0.18 | 0.17 |
 | United Kingdom | 0.01 | 0.56 |
 
-- **Six-month pattern.** In all three regions, growth is significantly linked to growth in the past ~6 months, not further back. Forecasting models should therefore use about 3–6 past months.
+- **Six-month pattern.** In all three regions, growth is significantly linked to growth in the past ~6 months, not further back. Forecasting models should therefore use about 3–6 past months. 3-6 were chosen because the lag-link is most prominent at around 3 months, still staying significant up to about lag 6, then fading into mostly noise.
 - **Lag 1 alone is misleading.** The UK's lag-1 value is almost zero, its lag-3 value the strongest in the whole data.
 - **Scotland zig-zags** month to month (negative lag 1). Likely reason: fewer recorded sales, so the monthly average is noisy. Still positive links at lags 2–8, momentum seems hidden under the noise.
-- **Lag-3 peak not explained yet.** Could be the market, could be how the index is built.
+- **Lag-3 peak not explained yet.** Could be the market, could be how the index is built. Further ideas documented to expand on that in research log.
 
 ### 2. It is not noise
 | Test | London | Scotland | UK |
@@ -44,7 +44,7 @@ The thinking behind each step, my predictions and the ideas I want to follow up 
 - **Length differs by region.** Ljung–Box evidence is strongest at 6 lags for London and the UK and weakens at 12. Scotland's keeps growing up to 12 lags.
 
 ### 3. Policy deadlines reverse, 2008 persisted
-Tax deadlines change *when* people buy, not *how much* they want to buy, comparable to a firm buying extra stock one year and less the next. That should give a spike followed by a reversal. 2008 was a collapse in lending, so bad months should follow bad months. Test in SQL (`LEAD`): each large monthly move plus the following month. Close to 0 = reversal, clearly negative = persistent.
+Tax deadlines change *when* people buy, not *how much* they want to buy, comparable to a firm buying extra stock one year and less the next, Investment budget used up. That should give a spike followed by a reversal. Significant exception 2008 was a collapse in lending, so bad months should follow bad months. Test in SQL (`LEAD`): each large monthly move plus the following month. Positive = confirmation hypothesis, close to 0 = reversal, clearly negative = persistent.
 
 | Event | Spike month | Next month | Sum |
 |---|---|---|---|
@@ -58,6 +58,12 @@ Tax deadlines change *when* people buy, not *how much* they want to buy, compara
 ### 4. Risk signals: SQL anomaly detector
 **Method (DuckDB, window functions).** For each month, average and standard deviation of growth over the **previous 12 months only**, like a real-time system that cannot see the future. Then a z-score: how many standard deviations the month lies from that recent normal. Flag if |z| > 3, threshold fixed before running.
 
+**What the z-score does.** z = (growth this month − average of the previous 12 months) ÷ standard deviation of the previous 12 months. How many standard deviations a month lies from its recent normal. z = 0 is a perfectly normal month, z = −3 a month far below what the past year would lead to expect.
+- **Why a z-score and not a fixed threshold.** A fixed rule like "flag every month below −2%" ignores context: −2% is extreme in a calm year, ordinary in a crisis. The z-score measures every move against the recent volatility, so calm and turbulent periods, and we make regions with different noise levels comparable. 
+- **Why 12 months.** Same reasoning as for the volatility-aware shuffle. Fewer months give an unstable estimate of the standard deviation and overlap with the ~6-month momentum. Twelve months are more stable, longer than the momentum, and cover a full year, so leftover seasonal effects even out. Longer windows would adapt too slowly and blur calm and crisis periods.
+- **Why 3.** Under normal noise a month beyond 3 standard deviations is rare, so a flag means something. Fixed in advance so the threshold could not be adjusted to the results.
+- **Trade-off.** Because the window keeps moving, the detector adapts to new conditions, which is useful after a shock but means it also adapts during a slow or longer-lasting crash as 2008 (see below).
+
 ![Monthly growth with flagged months](anomaly_flags.png)
 
 | Region | Flags | Average \|z\| | Largest \|z\| | Largest \|z\| in 2008–09 |
@@ -67,7 +73,7 @@ Tax deadlines change *when* people buy, not *how much* they want to buy, compara
 | United Kingdom | 13 | 1.1 | 9.17 | 4.42 |
 
 - **Policy shocks dominate.** Flags line up with Scotland's new tax (March/April 2015), the second-home tax surcharge (April 2016), the first lockdown (March/April 2020), Scotland's tax holiday (2020–21), the end of England's stamp duty holiday (June/July 2021) and the end of the temporary stamp duty cuts (March/April 2025). April 2025 is the most extreme month in the data (z = −9.17).
-- **Turning points, not slow crashes.** The deep 2008 crash months are mostly not flagged. Flagged is the start (UK, December 2007 and January 2008) and the turn to recovery (London, May and June 2009). Once a crash is underway, the 12-month window moves down with it and bad months start to look normal.
+- **Turning points, not slow crashes.** The deep 2008 crash months are mostly not flagged. Flagged is the start (UK, December 2007 and January 2008) and the turn to recovery (London, May and June 2009). Once a crash is underway, the 12-month window moves down with it and bad months start to look normal. Proves hypothesised trade-off surrounding the adapting-downside.
 - **Same shock, bigger in calm times.** April 2025 (−3.1% growth) scores far higher than July 2021 (−6.0%), the months before July 2021 were already volatile.
 - **Noise hides shocks.** Scotland, the noisiest series, has the lowest z-scores, the smooth UK average the highest.
 - **Fat tails.** Around 9 flags would be expected by chance across all regions, there are 31. More extreme months than normal noise predicts.
