@@ -44,7 +44,7 @@ The thinking behind each step, my predictions and the ideas I want to follow up 
 - **Length differs by region.** Ljung–Box evidence is strongest at 6 lags for London and the UK and weakens at 12. Scotland's keeps growing up to 12 lags.
 
 ### 3. Policy deadlines reverse, 2008 persisted
-Tax deadlines change *when* people buy, not *how much* they want to buy, comparable to a firm buying extra stock one year and less the next, Investment budget used up. That should give a spike followed by a reversal. Significant exception 2008 was a collapse in lending, so bad months should follow bad months. Test in SQL (`LEAD`): each large monthly move plus the following month. Positive = confirmation hypothesis, close to 0 = reversal, clearly negative = persistent.
+Tax deadlines change *when* people buy, not *how much* they want to buy, comparable to a firm buying extra stock one year and less the next, Investment budget used up. That should give a spike followed by a reversal. Significant exception 2008 was a collapse in lending, so bad months should follow bad months. Test in SQL (`LEAD`): each large monthly move plus the following month. close to 0 = reversal, high absolute value = persistent move.
 
 | Event | Spike month | Next month | Sum |
 |---|---|---|---|
@@ -73,7 +73,7 @@ Tax deadlines change *when* people buy, not *how much* they want to buy, compara
 | United Kingdom | 13 | 1.1 | 9.17 | 4.42 |
 
 - **Policy shocks dominate.** Flags line up with Scotland's new tax (March/April 2015), the second-home tax surcharge (April 2016), the first lockdown (March/April 2020), Scotland's tax holiday (2020–21), the end of England's stamp duty holiday (June/July 2021) and the end of the temporary stamp duty cuts (March/April 2025). April 2025 is the most extreme month in the data (z = −9.17).
-- **Turning points, not slow crashes.** The deep 2008 crash months are mostly not flagged. Flagged is the start (UK, December 2007 and January 2008) and the turn to recovery (London, May and June 2009). Once a crash is underway, the 12-month window moves down with it and bad months start to look normal. Proves hypothesised trade-off surrounding the adapting-downside.
+- **Turning points, not slow crashes.** The deep 2008 crash months are mostly not flagged. Flagged is the start (UK, December 2007 and January 2008) and the turn to recovery (London, May and June 2009). Once a crash is underway, the 12-month window moves down with it and bad months start to look normal. Confirms the hypothesised trade-off surrounding the adapting-window-downside.
 - **Same shock, bigger in calm times.** April 2025 (−3.1% growth) scores far higher than July 2021 (−6.0%), the months before July 2021 were already volatile.
 - **Noise hides shocks.** Scotland, the noisiest series, has the lowest z-scores, the smooth UK average the highest.
 - **Fat tails.** Around 9 flags would be expected by chance across all regions, there are 31. More extreme months than normal noise predicts.
