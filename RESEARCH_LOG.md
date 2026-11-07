@@ -1,49 +1,81 @@
 # Research Log
-
-How this project developed: the questions I asked, the decisions I made and why, and the ideas I want to follow up. The clean results are in the [README](README.md).
-
----
+How this project developed: the questions I asked, the decisions I made and why, my predictions, and the ideas I want to follow up. Clean results are in the [README](README.md).
 
 ## 5 November 2026: Data and first patterns
-
-**Choosing the data.** The UK HPI full file goes back to 1968. My first chart showed flat months followed by sudden jumps before the mid-1990s, which is not real monthly movement, so I cut the old data. When I checked where each region's seasonally adjusted series starts, London began in 1995, Scotland in 2004 and the UK in 2005. The gov.uk methodology page confirmed why: Scotland's data joins in 2004 and Northern Ireland's in 2005, so a UK-wide series cannot start earlier. I started all regions in 2005 so they are compared over the same period.
-
-**Does last month predict this month?** I measured autocorrelation. My first question was whether the sign matters or only the size. It matters: London's +0.22 means momentum, while Scotland's −0.18 means the series zig-zags. Similar size, opposite meaning.
-
-**Lag 1 is not the whole story.** The UK's lag-1 value was almost zero, but its chart showed the strongest link in the whole data at lag 3 (about 0.56). Looking at one number would have hidden this. In all regions, the significant links sat in the first ~6 months, which suggests momentum lasts about half a year. This directly shapes the forecasting models: they should use about 3–6 past months.
+- **Choosing the data.** The UK HPI full file goes back to 1968. First chart showed flat months followed by sudden jumps before the mid-1990s, not real monthly movement, therefore cut. Checking where each region's seasonally adjusted series starts: London 1995, Scotland 2004, UK 2005. The gov.uk methodology page confirms why: Scotland's data joins in 2004, Northern Ireland's in 2005, so no UK-wide series before 2005. All regions start in 2005 to be comparable.
+- **Does last month predict this month?** Measured autocorrelation. First question: does the sign matter or only the size? The sign matters. London's +0.22 means momentum, Scotland's −0.18 means the series zig-zags. Similar size, opposite meaning.
+- **Lag 1 is not the whole story.** The UK's lag-1 value is almost zero, its chart shows the strongest link of the whole data at lag 3 (about 0.56). One number would have hidden this.
+- **About six months.** In all regions the significant links sit in the first ~6 months, momentum seems to last about half a year. Directly shapes the forecasting models: about 3–6 past months as input.
 
 ## 5 November 2026: Can I measure how likely a pattern is noise?
-
-**Three approaches.** The blue confidence band in the charts already answers this visually. The Ljung–Box test answers it for many lags at once. And I built my own shuffle test: if the order of months does not matter, shuffling them should not change anything. I shuffled the UK months 10,000 times; the real lag-3 value was far outside everything chance produced.
-
-**My idea of combining lags by squaring and adding** turned out to be the same principle that the Ljung–Box test uses: it adds up squared autocorrelations across lags.
-
-**Reading the Ljung–Box results by number of lags.** For London and the UK, the evidence is strongest at 6 lags and gets slightly weaker at 12, which confirms the six-month pattern from a second angle. Scotland's evidence keeps growing up to 12 lags. To check what lags 7–12 add, I used the rule that pure noise adds about 1 to the test statistic per extra lag: the UK added about the noise amount (+5.5 for 6 extra lags), London about twice that (+12.9), Scotland well above it (+15.4).
+- **Three approaches.** The blue confidence band in the charts answers it visually, the Ljung–Box test for many lags at once, and my own shuffle test: if the order of months does not matter, shuffling them should not change anything. Shuffled the UK months 10,000 times, the real lag-3 value was far outside everything chance produced.
+- **Squaring and adding lags.** My idea of combining several lags by squaring and adding turned out to be the same principle the Ljung–Box test uses.
+- **Distance, not chart scale.** A chart can make a gap look big or small. What counts is the distance relative to the spread of the shuffled values: about 0.06 with 260 months, so 0.56 is about 9 spreads away.
+- **Reading Ljung–Box by number of lags.** London and the UK: strongest at 6 lags, slightly weaker at 12, the six-month pattern confirmed from a second angle. Scotland: keeps growing up to 12 lags. Rule of thumb: pure noise adds about 1 to the test statistic per extra lag. From 6 to 12 lags the UK added about the noise amount (+5.5), London about twice (+12.9), Scotland well above it (+15.4).
 
 ## 5–6 November 2026: Designing my own test
+- **Problem with plain shuffling.** Mixes calm months with crisis months (2008, 2020–21), may make the pattern look stronger than it is.
+- **My design: volatility-aware shuffle.** Measure each month's volatility, split months into groups from calm to turbulent, shuffle only inside each group.
+- **Decisions and reasons:**
+  - **12-month volatility window.** Six months: unstable estimate, overlaps with the ~6-month momentum. Twelve months: more stable, longer than the momentum, contains whole 3-month cycles and a full year, so no cycle cut in half.
+  - **Crises kept in.** Removing crashes before measuring volatility would defeat the purpose of the grouping.
+  - **2, 3 and 4 groups, fixed in advance, all reported.** Too many groups leave too few months to shuffle, too few cannot separate calm from crisis. Choosing after seeing results would make the test meaningless.
+  - **Same lag for all regions.** Lag 3 everywhere for comparability, even though it is not Scotland's strongest lag.
+  - **One change at a time.** Robustness checks planned as a 2 × 2 design: normal vs rank-based statistic (my median idea, stops a few extreme months from dominating) and plain vs volatility-aware shuffle. Each test differs from its neighbour in exactly one thing, so any difference has a clear cause.
+- **Prediction before running:** if crisis months inflated the evidence, p-values should rise under the stricter test.
+- **Result.** London and the UK unchanged at p < 0.0001 in every version, the momentum is robust. Scotland rose from 0.005 to 0.015–0.032 as groups got finer. Part of its evidence came from mixing calm and crisis periods, still passes at 5%.
 
-**The problem with plain shuffling.** It mixes calm months with crisis months (2008, 2020–21), which may make the real pattern look stronger than it is.
+## 6 November 2026: Planning an anomaly detector
+- **Question.** Which months were unusual compared with the recent past? Turns the project towards risk analysis: flag unusual months, then check each flag, real event, data problem or false alarm.
+- **Approaches compared.** Fixed growth threshold (ignores context), rolling z-score (month vs average and spread of the previous 12 months), robust z-score (median instead of average, extreme months cannot distort what counts as normal), model-based (flags months where a forecast misses badly), cross-region comparison.
+- **Decisions:**
+  - Main detector rolling z-score, robustness check robust (median-based) z-score. A month flagged by both is a strong signal.
+  - Only past months: the window is the 12 months before each month, not including it, like a real-time system, and an extreme month cannot partly hide itself.
+  - Threshold fixed in advance: 3 spreads.
+  - Built in SQL (DuckDB) with window functions.
+  - Planned addition: model-based detector once the forecasting models exist.
 
-**My design: a volatility-aware shuffle.** Measure each month's volatility, split months into groups from calm to turbulent, and shuffle only inside each group.
+## 6 November 2026: First SQL observations
+- **2008 and 2009.** 2008 negative almost everywhere, 2009 already positive. Prices recovered within 2009, yearly averages hide what happens inside the year.
+- **2023 negative for London and the UK.** Fits the sharp interest rate rises of 2022–23, argument for adding the Bank Rate to the forecasting models.
+- **Brexit.** No clear impact in yearly averages, in comparison to other sectors not surprising. One could also have expected more investment, UK real estate not exposed to EU trade barriers. Effects ambiguous though: uncertainty may scare buyers, the weaker pound made UK property cheaper for foreigners. Also confounded by the April 2016 surcharge on second homes. Worth checking London in 2017–2019 separately.
+- **Worst months.** Mostly 2020–21 and policy months, Scotland appears often. Not clustered, except the expected 2008 cluster. Interestingly, the 2008 months are not the most extreme ones: prices fell less instantly, more over a longer run of bad months.
 
-Decisions and reasons:
-- **12-month volatility window.** Six months gives an unstable estimate and overlaps with the ~6-month momentum. Twelve months is more stable, longer than the momentum, and contains whole numbers of possible 3-month cycles and of years, so no cycle is cut in half.
-- **Crises kept in.** Removing crashes before measuring volatility would defeat the purpose of the grouping.
-- **2, 3 and 4 groups, fixed in advance, all reported.** Too many groups leave too few months to shuffle; too few cannot separate calm from crisis. Choosing the grouping after seeing results would make the test meaningless.
-- **One change at a time.** I planned the robustness checks as a 2 × 2 design: normal vs rank-based statistic (rank-based is my median idea: it stops a few extreme months dominating), and plain vs volatility-aware shuffle. Each test differs from its neighbour in exactly one thing, so any difference has a clear cause.
+## 6 November 2026: Timing shocks vs fundamental shocks
+- **Observation.** Almost all non-2008 extreme months come right after a large move in the opposite direction. In 2008 bad months followed bad months.
+- **Hypothesis.** Policy changes make buying more or less opportune at a certain moment. A firm buying a lot of inventory one year buys below average the next, without suffering financially. Same with deadlines: they change *when* people buy, not *how much*, so spike followed by reversal (timing shock). 2008 was different, the whole market sank out of control, demand really fell (fundamental shock).
+- **Test (SQL, `LEAD`).** For the 8 largest moves per region: this month plus next month. Reversal gives a sum near 0, persistent fall a clearly negative sum.
+- **Prediction:** policy months near 0, 2008 months clearly negative.
+- **Results.**
+  - Policy deadlines reverse: UK June 2021 +4.62 then −5.99 (sum −1.36), September 2021 +3.14 then −2.24 (+0.90), both steps of the end of England's stamp duty holiday. Scotland March 2015 +4.41 then −5.12 (−0.71), its new property tax from April 2015. London March 2020 +2.21 then −2.13 (+0.08), first lockdown.
+  - 2008 persists: Scotland June 2008 −3.99 then −1.55 (−5.54), UK November 2008 −2.35 then −1.47 (−3.83).
+- **Refinements.**
+  - The test has to be read on the spike month. On the dip month the next month is usually normal, so the sum stays close to the dip.
+  - A long policy window behaves differently from a deadline: Scotland September 2020 (+4.19, then +2.29) came during a tax holiday lasting months, so demand rose over months instead of one spike.
+  - Part of a pre-deadline spike may come from which homes sold (e.g. more homes under the tax-free limit), not only from what homes are worth.
+  - Unexplained: London, May 2011 (−3.91, then +0.77).
+- **Consequence for the detector.** Timing shocks are sudden, should be flagged easily. Slow crashes like 2008 maybe not: the rolling window moves down with the crash. Drawdown (distance below the previous peak) could catch them.
 
-**My prediction before running it:** if crisis months inflated the evidence, the p-values should rise under the stricter test.
-
-**Result.** London and the UK stayed at p < 0.0001 in every version: the momentum is robust. Scotland's p-value rose from 0.005 to 0.015–0.032 as the groups got finer, exactly the pattern I predicted for noisier data. Part of Scotland's evidence came from mixing calm and crisis periods, but it still passes at the 5% level.
+## 7 November 2026: Anomaly detector results
+- **Setup.** Rolling z-score in SQL, previous 12 months, flag if |z| > 3, all fixed before running.
+- **My predictions before running:**
+  - Scotland measured only against itself shows fewer extremes, but because it is more volatile and follows long patterns less, it will have higher z-values on average.
+  - The 2008 months score slightly higher than others, they still stand out in 260 months, but only marginally, since the usual spikes and reversals appear often enough in the data.
+- **Results.** 31 flags (London 7, Scotland 11, UK 13). Average |z|: London 1.0, Scotland 0.9, UK 1.1. Largest |z|: London 6.74, Scotland 6.18, UK 9.17 (April 2025).
+- **Prediction 1 wrong, for a useful reason.** Scotland has the lowest z-scores. Its constant noise makes its 12-month spread large, so even big moves look small relative to it. The UK average is smooth, so sudden shocks stand out enormously. Noisy series hide shocks, smooth series expose them.
+- **Prediction 2 wrong too.** The largest 2008–09 z-score (London 3.33, UK 4.42, Scotland 2.89) is well below each region's maximum. Deep crash months mostly not flagged at all. Flagged is the start of the crash (UK, December 2007 and January 2008) and the turn to recovery (London, May and June 2009). Confirms my earlier point that 2008 was a long run of bad months: the window moved down with the crash. The detector catches changes of direction, not slow declines.
+- **Further findings.**
+  - Policy deadlines dominate the flags: Scotland 2015, April 2016 surcharge, 2020 lockdown, 2020–21 tax holidays, end of the temporary stamp duty cuts in April 2025.
+  - Same shock looks bigger in calm times: April 2025 (−3.1%) scores −9.17, July 2021 (−6.0%) only −4.61, the months before July 2021 were already volatile.
+  - 31 flags is about three times what chance would give (around 9), all regions have fat tails.
+  - Open: London May 2011 (z = −6.74) still unexplained. UK June 2026 is provisional data and may disappear after revisions.
+- **Conclusion.** A risk system needs at least two kinds of signal: a fast one for sudden shocks (z-score) and a slow one for gradual declines (e.g. drawdown).
 
 ## Ideas for later
-
-**Do busier markets process information faster?** If effects play out per transaction rather than per month, busier markets should show shorter momentum. London vs the UK does not show this: momentum lasts about six months in both, and London is more persistent month to month. But two series cannot test it, and London is part of the UK. A proper test would compare many regions, measuring momentum length against monthly sales volume, i.e. measuring markets in transactions instead of calendar time.
-
-**Assume the pattern is everywhere, measure how hidden it is.** Instead of asking whether momentum exists in each region, assume a shared momentum plus region-specific noise, and estimate the signal-to-noise ratio (a state-space model). A testable prediction: the noise in an average price should shrink with the number of sales, roughly in proportion to 1 / √(sales). If many regions fit that one rule, the assumption becomes much more credible. The real check would be whether it forecasts better than models without the assumption.
-
-**The market as overlapping patterns.** Seasonality is one pattern; there may be others that together look like noise. Spectral analysis could find cycles of other lengths (for example the lag-3 effect), and factor models could find shared drivers such as interest rates or tax changes. With about 260 months only a few strong components can be found reliably, so named candidates should be tested rather than searched for blindly.
-
-**Big cities vs their surroundings.** How do large cities move relative to their surrounding regions, and where does the link fade? This connects to the UK "ripple effect" and to research on "superstar cities". Starting point: UK cities vs their regions within the same dataset, before any international comparison, where differences in index methods would distort results.
-
-**Normal times vs extreme times.** Markets may behave differently in calm and crisis periods (regime switching). Separating "normal" forecasts from "extreme event" signals could show when to shift towards protection against crises.
+- **Do busier markets process information faster?** If effects play out per transaction rather than per month, busier markets should show shorter momentum. London vs the UK does not show this: momentum about six months in both, London more persistent month to month. Two series cannot test it though, and London is part of the UK. Proper test: many regions, momentum length against monthly sales volume, measuring markets in transactions instead of calendar time.
+- **Assume the pattern everywhere, measure how hidden it is.** Instead of asking whether momentum exists in each region, assume a shared momentum plus region-specific noise and measure the signal-to-noise ratio (state-space model). Testable: the noise in an average price should shrink with the number of sales, roughly with 1 / √(sales). If many regions fit one such general formula, the assumption becomes more credible. Real check: does it forecast better than models without the assumption.
+- **The market as overlapping patterns.** Seasonality is one pattern, others may exist that together look like unreadable noise. Spectral analysis could find cycles of other lengths (e.g. the lag-3 effect), factor models shared drivers like interest rates or tax changes, and their weights. With about 260 months only a few strong components can be found reliably, so named candidates should be tested, not searched for blindly.
+- **Big cities vs their surroundings.** How do very large cities move relative to their surrounding regions, with which factors (population, prices, income, cost of living, development), and where does the link fade? Connects to the UK "ripple effect" and research on "superstar cities". Starting point: UK cities vs their regions within the same dataset, before going international, where different index methods would distort results.
+- **Normal times vs extreme times.** Markets may behave differently in calm and crisis periods (regime switching). Splitting normal forecasts from extreme-event signals could show when to shift towards protection against crises. Even with many false alarms this can pay off, as long as each hedge is cheap compared with the crisis payoff.
+- **Does the curve move or shift?** A movement along the curve swings back (sums near 0), a change in the market's structure should leave a lasting new level. One event can be both: Scotland's 2015 tax caused a timing spike but may also have permanently changed prices of expensive homes, their tax rose for good. Test: event study, price level 12 months before and after each event, back to the old trend or a new one?
+- **The market as a many-dimensional machine.** What I measure, like a price index, is a result variable: the point where many effect variables meet and intertwine, like a point on a graph with far more than three axes. The real goal is to dissect these layers and find the rules each effect variable follows, not only observe where they combine. A simple movement may be the same machine with most variables fixed in the short run, or with the affected variables moving in harmony. In economics this is the identification problem: isolating one cause needs variation that moves that cause alone. Possible tools: natural experiments (England and Scotland changed taxes at different times, one can serve as comparison for the other, difference-in-differences), structural vector autoregressions (separating shocks and tracing how each spreads through the system), factor models (hidden common drivers behind many series).
