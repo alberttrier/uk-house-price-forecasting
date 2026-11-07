@@ -1,5 +1,5 @@
 # UK-house-price-forecasting
-**Question:** Does UK house price growth have momentum, which months were unusual, and can simple time-series models forecast it better than a naive guess or random distribution?
+**Question:** Does UK house price growth have momentum, which months were unusual, and can simple time-series models forecast it better than a naive guess or a random walk?
 
 **Status:** Data preparation, momentum and noise tests, a timing-shock analysis and a SQL anomaly detector are done. Forecast comparison and emerging questions further outlined in research log are next.
 
