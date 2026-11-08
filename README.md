@@ -37,7 +37,9 @@ The thinking behind each step, my predictions and the ideas I want to follow up 
 | Ljung–Box, 6 lags (p-value) | 2.7e-28 | 3.5e-06 | 9.3e-24 |
 | Plain shuffle, lag 3 (p-value) | < 0.0001 | 0.0052 | < 0.0001 |
 | Volatility-aware shuffle, 2 / 3 / 4 groups | < 0.0001 (all) | 0.015 / 0.024 / 0.032 | < 0.0001 (all) |
+| Combined lags 1–6, plain shuffle (p-value) | < 0.0001 | < 0.0001 | < 0.0001 |
 
+- **Combined lags (no lag chosen).** Lag 3 was picked after seeing the data, a possible selection bias. Testing lags 1–6 together, equal weights and squared so opposite signs cannot cancel, removes this choice. All three regions stay far beyond chance. Scotland gets clearly stronger (p from 0.0052 to < 0.0001): its pattern is spread across several lags, testing one lag hid part of it.
 - **Shuffle tests** destroy the time order 10,000 times and check how often chance matches the real value.
 - **Volatility-aware shuffle (my design).** Plain shuffling mixes calm and crisis months. My version only swaps months with similar volatility. London and the UK stay significant in every version. Scotland weakens as the test gets stricter, part of its evidence came from mixing calm and crisis periods, but it still passes at the 5% level.
 - **Distance, not chart scale.** With about 260 months, noise autocorrelations spread by roughly 0.06, so the UK's 0.56 sits about 9 spreads from zero.
